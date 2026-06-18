@@ -1,0 +1,930 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_InvoiceToPayment" targetNamespace="http://example.com/invoice-to-payment" exporter="bpmn-js (https://demo.bpmn.io)" exporterVersion="18.16.0">
+  <bpmn:collaboration id="Collaboration_InvoiceToPayment" name="Invoice-to-Payment Collaboration">
+    <bpmn:participant id="Participant_Vendor" name="Vendor" processRef="Process_Vendor" />
+    <bpmn:participant id="Participant_Procurement" name="Procurement Department" processRef="Process_Procurement" />
+    <bpmn:participant id="Participant_AP" name="Finance / Accounts Payable" processRef="Process_AP" />
+    <bpmn:participant id="Participant_Bank" name="Bank / Payment Provider" processRef="Process_Bank" />
+    <bpmn:messageFlow id="Msg_Invoice_Submitted" name="Invoice" sourceRef="V_SendInvoice" targetRef="AP_StartInvoiceReceived" />
+    <bpmn:messageFlow id="Msg_Exception_To_Procurement" name="Clarification request" sourceRef="AP_ReviewException" targetRef="P_StartClarification" />
+    <bpmn:messageFlow id="Msg_Procurement_To_AP" name="Clarification response" sourceRef="P_SendClarification" targetRef="AP_ReviewException" />
+    <bpmn:messageFlow id="Msg_AP_To_Bank" name="Payment instruction" sourceRef="AP_SendPaymentInstruction" targetRef="B_StartPaymentInstruction" />
+    <bpmn:messageFlow id="Msg_Bank_To_AP" name="Bank response" sourceRef="B_SendAuthorizationResponse" targetRef="AP_ReceiveBankConfirmation" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Vendor" name="Vendor Process" isExecutable="false">
+    <bpmn:startEvent id="V_Start" name="Invoice Prepared">
+      <bpmn:outgoing>V_Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sendTask id="V_SendInvoice" name="Send Invoice to Buyer">
+      <bpmn:incoming>V_Flow_1</bpmn:incoming>
+      <bpmn:outgoing>V_Flow_2</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="V_EndInvoiceSent" name="Invoice Sent">
+      <bpmn:incoming>V_Flow_2</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="V_Flow_1" sourceRef="V_Start" targetRef="V_SendInvoice" />
+    <bpmn:sequenceFlow id="V_Flow_2" sourceRef="V_SendInvoice" targetRef="V_EndInvoiceSent" />
+  </bpmn:process>
+  <bpmn:process id="Process_Procurement" name="Procurement Clarification Process" isExecutable="false">
+    <bpmn:startEvent id="P_StartClarification" name="Clarification Requested">
+      <bpmn:outgoing>P_Flow_1</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="P_StartClarification_MessageDefinition" />
+    </bpmn:startEvent>
+    <bpmn:userTask id="P_ReviewPOGR" name="Review PO / GR Discrepancy">
+      <bpmn:incoming>P_Flow_1</bpmn:incoming>
+      <bpmn:outgoing>P_Flow_2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sendTask id="P_SendClarification" name="Send Clarification or Correction">
+      <bpmn:incoming>P_Flow_2</bpmn:incoming>
+      <bpmn:outgoing>P_Flow_3</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="P_EndClarified" name="Clarification Sent">
+      <bpmn:incoming>P_Flow_3</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="P_Flow_1" sourceRef="P_StartClarification" targetRef="P_ReviewPOGR" />
+    <bpmn:sequenceFlow id="P_Flow_2" sourceRef="P_ReviewPOGR" targetRef="P_SendClarification" />
+    <bpmn:sequenceFlow id="P_Flow_3" sourceRef="P_SendClarification" targetRef="P_EndClarified" />
+  </bpmn:process>
+  <bpmn:process id="Process_AP" name="Invoice-to-Payment Process" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_AP">
+      <bpmn:lane id="Lane_PaymentRecon" name="Payment &#38; Reconciliation Team">
+        <bpmn:flowNodeRef>AP_SchedulePayment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_ExecutePaymentRun</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_SendPaymentInstruction</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_ReceiveBankConfirmation</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_GW_PaymentSuccessful</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_UpdatePaymentStatus</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_ReconcilePayment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_GW_ReconciliationMatched</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_CloseInvoice</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_EndPaid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_CreatePaymentFailureCase</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_EndPaymentFailed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_CreateReconException</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_EndReconException</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_FinanceApprover" name="Finance Approver">
+        <bpmn:flowNodeRef>AP_ReviewException</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_GW_ExceptionResolved</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_ApproveInvoice</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_GW_InvoiceApproved</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_UpdateRejected</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_NotifyRejection</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_EndRejected</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_APSystem" name="AP Validation System / SAP">
+        <bpmn:flowNodeRef>AP_ValidateMandatoryFields</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_GW_DataComplete</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_ValidateVendorMaster</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_GW_VendorExists</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_CheckPOReference</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_GW_POAvailable</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_GW_MatchSuccessful</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_ThreeWayMatch</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_PostInvoice</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_GW_ApprovalRequired</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_InvoiceProcessing" name="Invoice Processing Team">
+        <bpmn:flowNodeRef>AP_StartInvoiceReceived</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_ReceiveInvoice</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_VerifyLegibility</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_GW_Readable</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_RequestMissingInfo</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_RequestCorrectedInvoice</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_EndPendingCorrection</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AP_EndPendingInfo</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="AP_StartInvoiceReceived" name="Invoice Received">
+      <bpmn:outgoing>AP_Flow_1</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="AP_StartInvoiceReceived_MessageDefinition" />
+    </bpmn:startEvent>
+    <bpmn:receiveTask id="AP_ReceiveInvoice" name="Receive Vendor Invoice">
+      <bpmn:incoming>AP_Flow_1</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_2</bpmn:outgoing>
+    </bpmn:receiveTask>
+    <bpmn:userTask id="AP_VerifyLegibility" name="Verify Invoice Legibility">
+      <bpmn:incoming>AP_Flow_2</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_3</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="AP_GW_Readable" name="Invoice Readable?">
+      <bpmn:incoming>AP_Flow_3</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_4</bpmn:outgoing>
+      <bpmn:outgoing>AP_Flow_5</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="AP_RequestMissingInfo" name="Request Missing Information">
+      <bpmn:incoming>AP_Flow_9</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_10</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:serviceTask id="AP_ValidateMandatoryFields" name="Validate Mandatory Fields">
+      <bpmn:incoming>AP_Flow_4</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="AP_GW_DataComplete" name="Data Complete?">
+      <bpmn:incoming>AP_Flow_7</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_8</bpmn:outgoing>
+      <bpmn:outgoing>AP_Flow_9</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="AP_ValidateVendorMaster" name="Validate Vendor Master Data">
+      <bpmn:incoming>AP_Flow_8</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_11</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="AP_GW_VendorExists" name="Vendor Exists?">
+      <bpmn:incoming>AP_Flow_11</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_12</bpmn:outgoing>
+      <bpmn:outgoing>AP_Flow_13</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="AP_CheckPOReference" name="Check PO Reference">
+      <bpmn:incoming>AP_Flow_12</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_14</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="AP_GW_POAvailable" name="PO Available?">
+      <bpmn:incoming>AP_Flow_14</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_15</bpmn:outgoing>
+      <bpmn:outgoing>AP_Flow_16</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="AP_GW_MatchSuccessful" name="Match Successful?">
+      <bpmn:incoming>AP_Flow_17</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_18</bpmn:outgoing>
+      <bpmn:outgoing>AP_Flow_19</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="AP_ReviewException" name="Review Vendor / PO Exception">
+      <bpmn:incoming>AP_Flow_13</bpmn:incoming>
+      <bpmn:incoming>AP_Flow_16</bpmn:incoming>
+      <bpmn:incoming>AP_Flow_19</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_20</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="AP_GW_ExceptionResolved" name="Exception Resolved?">
+      <bpmn:incoming>AP_Flow_20</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_21</bpmn:outgoing>
+      <bpmn:outgoing>AP_Flow_22</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="AP_ApproveInvoice" name="Approve Invoice">
+      <bpmn:incoming>AP_Flow_25</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_26</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="AP_GW_InvoiceApproved" name="Invoice Approved?">
+      <bpmn:incoming>AP_Flow_26</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_27</bpmn:outgoing>
+      <bpmn:outgoing>AP_Flow_28</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="AP_UpdateRejected" name="Update Invoice Status: Rejected">
+      <bpmn:incoming>AP_Flow_22</bpmn:incoming>
+      <bpmn:incoming>AP_Flow_28</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_29</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sendTask id="AP_NotifyRejection" name="Notify Vendor / Procurement">
+      <bpmn:incoming>AP_Flow_29</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_30</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="AP_EndRejected" name="Invoice Rejected">
+      <bpmn:incoming>AP_Flow_30</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="AP_SchedulePayment" name="Schedule Invoice for Payment">
+      <bpmn:incoming>AP_Flow_24</bpmn:incoming>
+      <bpmn:incoming>AP_Flow_27</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_31</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="AP_ExecutePaymentRun" name="Execute Payment Run">
+      <bpmn:incoming>AP_Flow_31</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_32</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sendTask id="AP_SendPaymentInstruction" name="Send Payment Instruction">
+      <bpmn:incoming>AP_Flow_32</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_33</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:receiveTask id="AP_ReceiveBankConfirmation" name="Receive Bank Confirmation">
+      <bpmn:incoming>AP_Flow_33</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_34</bpmn:outgoing>
+    </bpmn:receiveTask>
+    <bpmn:exclusiveGateway id="AP_GW_PaymentSuccessful" name="Payment Successful?">
+      <bpmn:incoming>AP_Flow_34</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_35</bpmn:outgoing>
+      <bpmn:outgoing>AP_Flow_36</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="AP_UpdatePaymentStatus" name="Update Payment Status">
+      <bpmn:incoming>AP_Flow_35</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_38</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:manualTask id="AP_ReconcilePayment" name="Reconcile Payment">
+      <bpmn:incoming>AP_Flow_38</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_39</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:exclusiveGateway id="AP_GW_ReconciliationMatched" name="Reconciliation Matched?">
+      <bpmn:incoming>AP_Flow_39</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_40</bpmn:outgoing>
+      <bpmn:outgoing>AP_Flow_41</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="AP_CloseInvoice" name="Close Invoice">
+      <bpmn:incoming>AP_Flow_40</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_42</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="AP_EndPaid" name="Invoice Paid &#38; Reconciled">
+      <bpmn:incoming>AP_Flow_42</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:businessRuleTask id="AP_ThreeWayMatch" name="Perform PO / GR / Invoice Match">
+      <bpmn:incoming>AP_Flow_15</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_17</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:serviceTask id="AP_PostInvoice" name="Post Invoice in SAP">
+      <bpmn:incoming>AP_Flow_18</bpmn:incoming>
+      <bpmn:incoming>AP_Flow_21</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_23</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="AP_GW_ApprovalRequired" name="Approval Required?">
+      <bpmn:incoming>AP_Flow_23</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_24</bpmn:outgoing>
+      <bpmn:outgoing>AP_Flow_25</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="AP_CreatePaymentFailureCase" name="Create Payment Failure Case">
+      <bpmn:incoming>AP_Flow_36</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_37</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="AP_EndPaymentFailed" name="Payment Failed">
+      <bpmn:incoming>AP_Flow_37</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="AP_CreateReconException" name="Create Reconciliation Exception">
+      <bpmn:incoming>AP_Flow_41</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_43</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="AP_EndReconException" name="Reconciliation Exception">
+      <bpmn:incoming>AP_Flow_43</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sendTask id="AP_RequestCorrectedInvoice" name="Request Corrected Invoice">
+      <bpmn:incoming>AP_Flow_5</bpmn:incoming>
+      <bpmn:outgoing>AP_Flow_6</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="AP_EndPendingCorrection" name="Pending Corrected Invoice">
+      <bpmn:incoming>AP_Flow_6</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="AP_EndPendingInfo" name="Pending Missing Information">
+      <bpmn:incoming>AP_Flow_10</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="AP_Flow_1" sourceRef="AP_StartInvoiceReceived" targetRef="AP_ReceiveInvoice" />
+    <bpmn:sequenceFlow id="AP_Flow_2" sourceRef="AP_ReceiveInvoice" targetRef="AP_VerifyLegibility" />
+    <bpmn:sequenceFlow id="AP_Flow_3" sourceRef="AP_VerifyLegibility" targetRef="AP_GW_Readable" />
+    <bpmn:sequenceFlow id="AP_Flow_4" name="Yes" sourceRef="AP_GW_Readable" targetRef="AP_ValidateMandatoryFields" />
+    <bpmn:sequenceFlow id="AP_Flow_5" name="No" sourceRef="AP_GW_Readable" targetRef="AP_RequestCorrectedInvoice" />
+    <bpmn:sequenceFlow id="AP_Flow_9" name="No" sourceRef="AP_GW_DataComplete" targetRef="AP_RequestMissingInfo" />
+    <bpmn:sequenceFlow id="AP_Flow_10" sourceRef="AP_RequestMissingInfo" targetRef="AP_EndPendingInfo" />
+    <bpmn:sequenceFlow id="AP_Flow_7" sourceRef="AP_ValidateMandatoryFields" targetRef="AP_GW_DataComplete" />
+    <bpmn:sequenceFlow id="AP_Flow_8" name="Yes" sourceRef="AP_GW_DataComplete" targetRef="AP_ValidateVendorMaster" />
+    <bpmn:sequenceFlow id="AP_Flow_11" sourceRef="AP_ValidateVendorMaster" targetRef="AP_GW_VendorExists" />
+    <bpmn:sequenceFlow id="AP_Flow_12" name="Yes" sourceRef="AP_GW_VendorExists" targetRef="AP_CheckPOReference" />
+    <bpmn:sequenceFlow id="AP_Flow_13" name="No" sourceRef="AP_GW_VendorExists" targetRef="AP_ReviewException" />
+    <bpmn:sequenceFlow id="AP_Flow_14" sourceRef="AP_CheckPOReference" targetRef="AP_GW_POAvailable" />
+    <bpmn:sequenceFlow id="AP_Flow_15" name="Yes" sourceRef="AP_GW_POAvailable" targetRef="AP_ThreeWayMatch" />
+    <bpmn:sequenceFlow id="AP_Flow_16" name="No" sourceRef="AP_GW_POAvailable" targetRef="AP_ReviewException" />
+    <bpmn:sequenceFlow id="AP_Flow_17" sourceRef="AP_ThreeWayMatch" targetRef="AP_GW_MatchSuccessful" />
+    <bpmn:sequenceFlow id="AP_Flow_18" name="Yes" sourceRef="AP_GW_MatchSuccessful" targetRef="AP_PostInvoice" />
+    <bpmn:sequenceFlow id="AP_Flow_19" name="No" sourceRef="AP_GW_MatchSuccessful" targetRef="AP_ReviewException" />
+    <bpmn:sequenceFlow id="AP_Flow_20" sourceRef="AP_ReviewException" targetRef="AP_GW_ExceptionResolved" />
+    <bpmn:sequenceFlow id="AP_Flow_21" name="Yes" sourceRef="AP_GW_ExceptionResolved" targetRef="AP_PostInvoice" />
+    <bpmn:sequenceFlow id="AP_Flow_22" name="No" sourceRef="AP_GW_ExceptionResolved" targetRef="AP_UpdateRejected" />
+    <bpmn:sequenceFlow id="AP_Flow_25" name="Yes" sourceRef="AP_GW_ApprovalRequired" targetRef="AP_ApproveInvoice" />
+    <bpmn:sequenceFlow id="AP_Flow_26" sourceRef="AP_ApproveInvoice" targetRef="AP_GW_InvoiceApproved" />
+    <bpmn:sequenceFlow id="AP_Flow_27" name="Yes" sourceRef="AP_GW_InvoiceApproved" targetRef="AP_SchedulePayment" />
+    <bpmn:sequenceFlow id="AP_Flow_28" name="No" sourceRef="AP_GW_InvoiceApproved" targetRef="AP_UpdateRejected" />
+    <bpmn:sequenceFlow id="AP_Flow_29" sourceRef="AP_UpdateRejected" targetRef="AP_NotifyRejection" />
+    <bpmn:sequenceFlow id="AP_Flow_30" sourceRef="AP_NotifyRejection" targetRef="AP_EndRejected" />
+    <bpmn:sequenceFlow id="AP_Flow_24" name="No" sourceRef="AP_GW_ApprovalRequired" targetRef="AP_SchedulePayment" />
+    <bpmn:sequenceFlow id="AP_Flow_31" sourceRef="AP_SchedulePayment" targetRef="AP_ExecutePaymentRun" />
+    <bpmn:sequenceFlow id="AP_Flow_32" sourceRef="AP_ExecutePaymentRun" targetRef="AP_SendPaymentInstruction" />
+    <bpmn:sequenceFlow id="AP_Flow_33" sourceRef="AP_SendPaymentInstruction" targetRef="AP_ReceiveBankConfirmation" />
+    <bpmn:sequenceFlow id="AP_Flow_34" sourceRef="AP_ReceiveBankConfirmation" targetRef="AP_GW_PaymentSuccessful" />
+    <bpmn:sequenceFlow id="AP_Flow_35" name="Yes" sourceRef="AP_GW_PaymentSuccessful" targetRef="AP_UpdatePaymentStatus" />
+    <bpmn:sequenceFlow id="AP_Flow_36" name="No" sourceRef="AP_GW_PaymentSuccessful" targetRef="AP_CreatePaymentFailureCase" />
+    <bpmn:sequenceFlow id="AP_Flow_38" sourceRef="AP_UpdatePaymentStatus" targetRef="AP_ReconcilePayment" />
+    <bpmn:sequenceFlow id="AP_Flow_39" sourceRef="AP_ReconcilePayment" targetRef="AP_GW_ReconciliationMatched" />
+    <bpmn:sequenceFlow id="AP_Flow_40" name="Yes" sourceRef="AP_GW_ReconciliationMatched" targetRef="AP_CloseInvoice" />
+    <bpmn:sequenceFlow id="AP_Flow_41" name="No" sourceRef="AP_GW_ReconciliationMatched" targetRef="AP_CreateReconException" />
+    <bpmn:sequenceFlow id="AP_Flow_42" sourceRef="AP_CloseInvoice" targetRef="AP_EndPaid" />
+    <bpmn:sequenceFlow id="AP_Flow_23" sourceRef="AP_PostInvoice" targetRef="AP_GW_ApprovalRequired" />
+    <bpmn:sequenceFlow id="AP_Flow_37" sourceRef="AP_CreatePaymentFailureCase" targetRef="AP_EndPaymentFailed" />
+    <bpmn:sequenceFlow id="AP_Flow_43" sourceRef="AP_CreateReconException" targetRef="AP_EndReconException" />
+    <bpmn:sequenceFlow id="AP_Flow_6" sourceRef="AP_RequestCorrectedInvoice" targetRef="AP_EndPendingCorrection" />
+  </bpmn:process>
+  <bpmn:process id="Process_Bank" name="Bank Authorization Process" isExecutable="false">
+    <bpmn:startEvent id="B_StartPaymentInstruction" name="Payment Instruction Received">
+      <bpmn:outgoing>B_Flow_1</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="B_StartPaymentInstruction_MessageDefinition" />
+    </bpmn:startEvent>
+    <bpmn:receiveTask id="B_ReceivePaymentInstruction" name="Receive Payment Instruction">
+      <bpmn:incoming>B_Flow_1</bpmn:incoming>
+      <bpmn:outgoing>B_Flow_2</bpmn:outgoing>
+    </bpmn:receiveTask>
+    <bpmn:businessRuleTask id="B_AuthorizePayment" name="Authorize Payment">
+      <bpmn:incoming>B_Flow_2</bpmn:incoming>
+      <bpmn:outgoing>B_Flow_3</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="B_GW_Authorized" name="Authorized?">
+      <bpmn:incoming>B_Flow_3</bpmn:incoming>
+      <bpmn:outgoing>B_Flow_4</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="B_SendAuthorizationResponse" name="Send Approval / Decline Response">
+      <bpmn:incoming>B_Flow_4</bpmn:incoming>
+      <bpmn:outgoing>B_Flow_5</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="B_EndResponseSent" name="Response Sent">
+      <bpmn:incoming>B_Flow_5</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="B_Flow_1" sourceRef="B_StartPaymentInstruction" targetRef="B_ReceivePaymentInstruction" />
+    <bpmn:sequenceFlow id="B_Flow_2" sourceRef="B_ReceivePaymentInstruction" targetRef="B_AuthorizePayment" />
+    <bpmn:sequenceFlow id="B_Flow_3" sourceRef="B_AuthorizePayment" targetRef="B_GW_Authorized" />
+    <bpmn:sequenceFlow id="B_Flow_4" name="Approved / Declined" sourceRef="B_GW_Authorized" targetRef="B_SendAuthorizationResponse" />
+    <bpmn:sequenceFlow id="B_Flow_5" sourceRef="B_SendAuthorizationResponse" targetRef="B_EndResponseSent" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_InvoiceToPayment">
+    <bpmndi:BPMNPlane id="BPMNPlane_InvoiceToPayment" bpmnElement="Collaboration_InvoiceToPayment">
+      <bpmndi:BPMNShape id="Participant_Vendor_di" bpmnElement="Participant_Vendor" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="5600" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="V_Start_di" bpmnElement="V_Start">
+        <dc:Bounds x="280" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="256" y="178" width="84" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="V_SendInvoice_di" bpmnElement="V_SendInvoice">
+        <dc:Bounds x="370" y="125" width="150" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="V_EndInvoiceSent_di" bpmnElement="V_EndInvoiceSent">
+        <dc:Bounds x="580" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="568" y="178" width="61" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="V_Flow_1_di" bpmnElement="V_Flow_1">
+        <di:waypoint x="316" y="160" />
+        <di:waypoint x="370" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="V_Flow_2_di" bpmnElement="V_Flow_2">
+        <di:waypoint x="520" y="160" />
+        <di:waypoint x="580" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_Procurement_di" bpmnElement="Participant_Procurement" isHorizontal="true">
+        <dc:Bounds x="160" y="270" width="5600" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="P_StartClarification_di" bpmnElement="P_StartClarification">
+        <dc:Bounds x="2027" y="332" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1941" y="336" width="58" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="P_ReviewPOGR_di" bpmnElement="P_ReviewPOGR">
+        <dc:Bounds x="2120" y="315" width="160" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="P_SendClarification_di" bpmnElement="P_SendClarification">
+        <dc:Bounds x="2330" y="315" width="180" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="P_EndClarified_di" bpmnElement="P_EndClarified">
+        <dc:Bounds x="2570" y="332" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2546" y="368" width="84" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="P_Flow_1_di" bpmnElement="P_Flow_1">
+        <di:waypoint x="2063" y="350" />
+        <di:waypoint x="2120" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="P_Flow_2_di" bpmnElement="P_Flow_2">
+        <di:waypoint x="2280" y="350" />
+        <di:waypoint x="2330" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="P_Flow_3_di" bpmnElement="P_Flow_3">
+        <di:waypoint x="2510" y="350" />
+        <di:waypoint x="2570" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_AP_di" bpmnElement="Participant_AP" isHorizontal="true">
+        <dc:Bounds x="160" y="460" width="5600" height="840" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_PaymentRecon_di" bpmnElement="Lane_PaymentRecon" isHorizontal="true">
+        <dc:Bounds x="190" y="1090" width="5570" height="210" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_FinanceApprover_di" bpmnElement="Lane_FinanceApprover" isHorizontal="true">
+        <dc:Bounds x="190" y="880" width="5570" height="210" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_APSystem_di" bpmnElement="Lane_APSystem" isHorizontal="true">
+        <dc:Bounds x="190" y="670" width="5570" height="210" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_InvoiceProcessing_di" bpmnElement="Lane_InvoiceProcessing" isHorizontal="true">
+        <dc:Bounds x="190" y="460" width="5570" height="210" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_StartInvoiceReceived_di" bpmnElement="AP_StartInvoiceReceived">
+        <dc:Bounds x="280" y="547" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="256" y="583" width="84" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_ReceiveInvoice_di" bpmnElement="AP_ReceiveInvoice">
+        <dc:Bounds x="370" y="530" width="150" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_VerifyLegibility_di" bpmnElement="AP_VerifyLegibility">
+        <dc:Bounds x="570" y="530" width="150" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_GW_Readable_di" bpmnElement="AP_GW_Readable" isMarkerVisible="true">
+        <dc:Bounds x="770" y="540" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="768" y="502.5" width="54" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_RequestMissingInfo_di" bpmnElement="AP_RequestMissingInfo">
+        <dc:Bounds x="1230" y="510" width="180" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_ValidateMandatoryFields_di" bpmnElement="AP_ValidateMandatoryFields">
+        <dc:Bounds x="900" y="725" width="170" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_GW_DataComplete_di" bpmnElement="AP_GW_DataComplete" isMarkerVisible="true">
+        <dc:Bounds x="1100" y="735" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1085" y="785" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_ValidateVendorMaster_di" bpmnElement="AP_ValidateVendorMaster">
+        <dc:Bounds x="1230" y="725" width="180" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_GW_VendorExists_di" bpmnElement="AP_GW_VendorExists" isMarkerVisible="true">
+        <dc:Bounds x="1440" y="735" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1428" y="711" width="74" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_CheckPOReference_di" bpmnElement="AP_CheckPOReference">
+        <dc:Bounds x="1570" y="725" width="160" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_GW_POAvailable_di" bpmnElement="AP_GW_POAvailable" isMarkerVisible="true">
+        <dc:Bounds x="1770" y="735" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1760" y="711" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_GW_MatchSuccessful_di" bpmnElement="AP_GW_MatchSuccessful" isMarkerVisible="true">
+        <dc:Bounds x="2110" y="735" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2105" y="697.5" width="60" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_ReviewException_di" bpmnElement="AP_ReviewException">
+        <dc:Bounds x="2170" y="920" width="180" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_GW_ExceptionResolved_di" bpmnElement="AP_GW_ExceptionResolved" isMarkerVisible="true">
+        <dc:Bounds x="2380" y="930" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2379" y="896" width="52" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_ApproveInvoice_di" bpmnElement="AP_ApproveInvoice">
+        <dc:Bounds x="2850" y="920" width="150" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_GW_InvoiceApproved_di" bpmnElement="AP_GW_InvoiceApproved" isMarkerVisible="true">
+        <dc:Bounds x="3050" y="930" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3048" y="896" width="54" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_UpdateRejected_di" bpmnElement="AP_UpdateRejected">
+        <dc:Bounds x="3260" y="920" width="190" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_NotifyRejection_di" bpmnElement="AP_NotifyRejection">
+        <dc:Bounds x="3490" y="920" width="180" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_EndRejected_di" bpmnElement="AP_EndRejected">
+        <dc:Bounds x="3710" y="937" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3687" y="973" width="82" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_SchedulePayment_di" bpmnElement="AP_SchedulePayment">
+        <dc:Bounds x="3270" y="1140" width="190" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_ExecutePaymentRun_di" bpmnElement="AP_ExecutePaymentRun">
+        <dc:Bounds x="3500" y="1140" width="170" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_SendPaymentInstruction_di" bpmnElement="AP_SendPaymentInstruction">
+        <dc:Bounds x="3700" y="1140" width="180" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_ReceiveBankConfirmation_di" bpmnElement="AP_ReceiveBankConfirmation">
+        <dc:Bounds x="4420" y="1140" width="180" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_GW_PaymentSuccessful_di" bpmnElement="AP_GW_PaymentSuccessful" isMarkerVisible="true">
+        <dc:Bounds x="4640" y="1150" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4635" y="1112.5" width="60" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_UpdatePaymentStatus_di" bpmnElement="AP_UpdatePaymentStatus">
+        <dc:Bounds x="4790" y="1140" width="170" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_ReconcilePayment_di" bpmnElement="AP_ReconcilePayment">
+        <dc:Bounds x="5000" y="1140" width="160" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_GW_ReconciliationMatched_di" bpmnElement="AP_GW_ReconciliationMatched" isMarkerVisible="true">
+        <dc:Bounds x="5200" y="1150" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5191" y="1112" width="69" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_CloseInvoice_di" bpmnElement="AP_CloseInvoice">
+        <dc:Bounds x="5350" y="1140" width="150" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_EndPaid_di" bpmnElement="AP_EndPaid">
+        <dc:Bounds x="5570" y="1157" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5614" y="1156" width="71" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_ThreeWayMatch_di" bpmnElement="AP_ThreeWayMatch">
+        <dc:Bounds x="1840" y="725" width="180" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_PostInvoice_di" bpmnElement="AP_PostInvoice">
+        <dc:Bounds x="2530" y="715" width="160" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_GW_ApprovalRequired_di" bpmnElement="AP_GW_ApprovalRequired" isMarkerVisible="true">
+        <dc:Bounds x="2845" y="725" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2843.5" y="698.5" width="51" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_CreatePaymentFailureCase_di" bpmnElement="AP_CreatePaymentFailureCase">
+        <dc:Bounds x="4780" y="1230" width="190" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_EndPaymentFailed_di" bpmnElement="AP_EndPaymentFailed">
+        <dc:Bounds x="5030" y="1242" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5010" y="1278" width="77" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_CreateReconException_di" bpmnElement="AP_CreateReconException">
+        <dc:Bounds x="5325" y="1230" width="200" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_EndReconException_di" bpmnElement="AP_EndReconException">
+        <dc:Bounds x="5600" y="1242" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5645" y="1246" width="85" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_RequestCorrectedInvoice_di" bpmnElement="AP_RequestCorrectedInvoice">
+        <dc:Bounds x="900" y="530" width="170" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_EndPendingCorrection_di" bpmnElement="AP_EndPendingCorrection">
+        <dc:Bounds x="1052" y="472" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1096" y="470.5" width="54" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AP_EndPendingInfo_di" bpmnElement="AP_EndPendingInfo">
+        <dc:Bounds x="1482" y="527" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1460" y="563" width="81" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="AP_Flow_1_di" bpmnElement="AP_Flow_1">
+        <di:waypoint x="316" y="565" />
+        <di:waypoint x="370" y="565" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_2_di" bpmnElement="AP_Flow_2">
+        <di:waypoint x="520" y="565" />
+        <di:waypoint x="570" y="565" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_3_di" bpmnElement="AP_Flow_3">
+        <di:waypoint x="720" y="565" />
+        <di:waypoint x="770" y="565" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_4_di" bpmnElement="AP_Flow_4">
+        <di:waypoint x="795" y="590" />
+        <di:waypoint x="795" y="760" />
+        <di:waypoint x="900" y="760" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="801" y="665" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_5_di" bpmnElement="AP_Flow_5">
+        <di:waypoint x="820" y="565" />
+        <di:waypoint x="900" y="565" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="854" y="540" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_9_di" bpmnElement="AP_Flow_9">
+        <di:waypoint x="1125" y="735" />
+        <di:waypoint x="1125" y="545" />
+        <di:waypoint x="1230" y="545" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1133" y="630" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_10_di" bpmnElement="AP_Flow_10">
+        <di:waypoint x="1410" y="545" />
+        <di:waypoint x="1482" y="545" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_7_di" bpmnElement="AP_Flow_7">
+        <di:waypoint x="1070" y="760" />
+        <di:waypoint x="1100" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_8_di" bpmnElement="AP_Flow_8">
+        <di:waypoint x="1150" y="760" />
+        <di:waypoint x="1230" y="760" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1181" y="735" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_11_di" bpmnElement="AP_Flow_11">
+        <di:waypoint x="1410" y="760" />
+        <di:waypoint x="1440" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_12_di" bpmnElement="AP_Flow_12">
+        <di:waypoint x="1490" y="760" />
+        <di:waypoint x="1570" y="760" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1521" y="735" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_13_di" bpmnElement="AP_Flow_13">
+        <di:waypoint x="1465" y="785" />
+        <di:waypoint x="1465" y="885" />
+        <di:waypoint x="2260" y="885" />
+        <di:waypoint x="2260" y="920" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1802" y="803" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_14_di" bpmnElement="AP_Flow_14">
+        <di:waypoint x="1730" y="760" />
+        <di:waypoint x="1770" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_15_di" bpmnElement="AP_Flow_15">
+        <di:waypoint x="1820" y="760" />
+        <di:waypoint x="1840" y="760" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1811" y="735" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_16_di" bpmnElement="AP_Flow_16">
+        <di:waypoint x="1795" y="785" />
+        <di:waypoint x="1795" y="900" />
+        <di:waypoint x="2250" y="900" />
+        <di:waypoint x="2250" y="920" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1442" y="793" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_17_di" bpmnElement="AP_Flow_17">
+        <di:waypoint x="2020" y="760" />
+        <di:waypoint x="2110" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_18_di" bpmnElement="AP_Flow_18">
+        <di:waypoint x="2160" y="760" />
+        <di:waypoint x="2345" y="760" />
+        <di:waypoint x="2345" y="750" />
+        <di:waypoint x="2530" y="750" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2429" y="725" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_19_di" bpmnElement="AP_Flow_19">
+        <di:waypoint x="2135" y="785" />
+        <di:waypoint x="2135" y="955" />
+        <di:waypoint x="2170" y="955" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2143" y="860" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_20_di" bpmnElement="AP_Flow_20">
+        <di:waypoint x="2350" y="955" />
+        <di:waypoint x="2380" y="955" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_21_di" bpmnElement="AP_Flow_21">
+        <di:waypoint x="2430" y="955" />
+        <di:waypoint x="2500" y="955" />
+        <di:waypoint x="2500" y="750" />
+        <di:waypoint x="2530" y="750" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2506" y="843" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_22_di" bpmnElement="AP_Flow_22">
+        <di:waypoint x="2405" y="980" />
+        <di:waypoint x="2405" y="1020" />
+        <di:waypoint x="3355" y="1020" />
+        <di:waypoint x="3355" y="990" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2652" y="995" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_25_di" bpmnElement="AP_Flow_25">
+        <di:waypoint x="2895" y="750" />
+        <di:waypoint x="2925" y="750" />
+        <di:waypoint x="2925" y="920" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2931" y="826" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_26_di" bpmnElement="AP_Flow_26">
+        <di:waypoint x="3000" y="955" />
+        <di:waypoint x="3050" y="955" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_27_di" bpmnElement="AP_Flow_27">
+        <di:waypoint x="3075" y="980" />
+        <di:waypoint x="3075" y="1120" />
+        <di:waypoint x="3365" y="1120" />
+        <di:waypoint x="3365" y="1140" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3081" y="1041" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_28_di" bpmnElement="AP_Flow_28">
+        <di:waypoint x="3100" y="955" />
+        <di:waypoint x="3260" y="955" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3173" y="930" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_29_di" bpmnElement="AP_Flow_29">
+        <di:waypoint x="3450" y="955" />
+        <di:waypoint x="3490" y="955" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_30_di" bpmnElement="AP_Flow_30">
+        <di:waypoint x="3670" y="955" />
+        <di:waypoint x="3710" y="955" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_24_di" bpmnElement="AP_Flow_24">
+        <di:waypoint x="2870" y="775" />
+        <di:waypoint x="2870" y="830" />
+        <di:waypoint x="2830" y="830" />
+        <di:waypoint x="2820" y="1175" />
+        <di:waypoint x="3270" y="1175" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2822" y="813" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_31_di" bpmnElement="AP_Flow_31">
+        <di:waypoint x="3460" y="1175" />
+        <di:waypoint x="3500" y="1175" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_32_di" bpmnElement="AP_Flow_32">
+        <di:waypoint x="3670" y="1175" />
+        <di:waypoint x="3700" y="1175" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_33_di" bpmnElement="AP_Flow_33">
+        <di:waypoint x="3880" y="1175" />
+        <di:waypoint x="4420" y="1175" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_34_di" bpmnElement="AP_Flow_34">
+        <di:waypoint x="4600" y="1175" />
+        <di:waypoint x="4640" y="1175" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_35_di" bpmnElement="AP_Flow_35">
+        <di:waypoint x="4690" y="1175" />
+        <di:waypoint x="4790" y="1175" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4731" y="1150" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_36_di" bpmnElement="AP_Flow_36">
+        <di:waypoint x="4665" y="1200" />
+        <di:waypoint x="4665" y="1260" />
+        <di:waypoint x="4780" y="1260" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4673" y="1220" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_38_di" bpmnElement="AP_Flow_38">
+        <di:waypoint x="4960" y="1175" />
+        <di:waypoint x="5000" y="1175" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_39_di" bpmnElement="AP_Flow_39">
+        <di:waypoint x="5160" y="1175" />
+        <di:waypoint x="5200" y="1175" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_40_di" bpmnElement="AP_Flow_40">
+        <di:waypoint x="5250" y="1175" />
+        <di:waypoint x="5350" y="1175" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5291" y="1150" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_41_di" bpmnElement="AP_Flow_41">
+        <di:waypoint x="5225" y="1200" />
+        <di:waypoint x="5225" y="1260" />
+        <di:waypoint x="5325" y="1260" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5233" y="1220" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_42_di" bpmnElement="AP_Flow_42">
+        <di:waypoint x="5500" y="1175" />
+        <di:waypoint x="5570" y="1175" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_23_di" bpmnElement="AP_Flow_23">
+        <di:waypoint x="2690" y="750" />
+        <di:waypoint x="2845" y="750" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_37_di" bpmnElement="AP_Flow_37">
+        <di:waypoint x="4970" y="1260" />
+        <di:waypoint x="5030" y="1260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_43_di" bpmnElement="AP_Flow_43">
+        <di:waypoint x="5525" y="1260" />
+        <di:waypoint x="5600" y="1260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="AP_Flow_6_di" bpmnElement="AP_Flow_6">
+        <di:waypoint x="985" y="530" />
+        <di:waypoint x="985" y="490" />
+        <di:waypoint x="1052" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_Bank_di" bpmnElement="Participant_Bank" isHorizontal="true">
+        <dc:Bounds x="160" y="1340" width="5600" height="170" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B_StartPaymentInstruction_di" bpmnElement="B_StartPaymentInstruction">
+        <dc:Bounds x="3772" y="1407" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3747" y="1450" width="86" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B_ReceivePaymentInstruction_di" bpmnElement="B_ReceivePaymentInstruction">
+        <dc:Bounds x="3860" y="1390" width="180" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B_AuthorizePayment_di" bpmnElement="B_AuthorizePayment">
+        <dc:Bounds x="4090" y="1390" width="160" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B_GW_Authorized_di" bpmnElement="B_GW_Authorized" isMarkerVisible="true">
+        <dc:Bounds x="4300" y="1400" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4296" y="1450" width="59" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B_SendAuthorizationResponse_di" bpmnElement="B_SendAuthorizationResponse">
+        <dc:Bounds x="4420" y="1390" width="210" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="B_EndResponseSent_di" bpmnElement="B_EndResponseSent">
+        <dc:Bounds x="4680" y="1407" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4660" y="1453" width="76" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="B_Flow_1_di" bpmnElement="B_Flow_1">
+        <di:waypoint x="3808" y="1425" />
+        <di:waypoint x="3860" y="1425" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="B_Flow_2_di" bpmnElement="B_Flow_2">
+        <di:waypoint x="4040" y="1425" />
+        <di:waypoint x="4090" y="1425" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="B_Flow_3_di" bpmnElement="B_Flow_3">
+        <di:waypoint x="4250" y="1425" />
+        <di:waypoint x="4300" y="1425" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="B_Flow_4_di" bpmnElement="B_Flow_4">
+        <di:waypoint x="4350" y="1425" />
+        <di:waypoint x="4420" y="1425" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4293" y="1366" width="54" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="B_Flow_5_di" bpmnElement="B_Flow_5">
+        <di:waypoint x="4630" y="1425" />
+        <di:waypoint x="4680" y="1425" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Msg_Invoice_Submitted_di" bpmnElement="Msg_Invoice_Submitted">
+        <di:waypoint x="445" y="195" />
+        <di:waypoint x="445" y="350" />
+        <di:waypoint x="298" y="350" />
+        <di:waypoint x="298" y="547" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="354" y="325" width="35" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Msg_Exception_To_Procurement_di" bpmnElement="Msg_Exception_To_Procurement">
+        <di:waypoint x="2170" y="970" />
+        <di:waypoint x="2020" y="970" />
+        <di:waypoint x="2042" y="368" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2040" y="936" width="69" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Msg_Procurement_To_AP_di" bpmnElement="Msg_Procurement_To_AP">
+        <di:waypoint x="2420" y="385" />
+        <di:waypoint x="2420" y="855" />
+        <di:waypoint x="2320" y="855" />
+        <di:waypoint x="2320" y="920" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2341" y="830" width="58" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Msg_AP_To_Bank_di" bpmnElement="Msg_AP_To_Bank">
+        <di:waypoint x="3790" y="1210" />
+        <di:waypoint x="3790" y="1407" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3734" y="1256" width="51" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Msg_Bank_To_AP_di" bpmnElement="Msg_Bank_To_AP">
+        <di:waypoint x="4525" y="1390" />
+        <di:waypoint x="4525" y="1210" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4443" y="1263" width="74" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
